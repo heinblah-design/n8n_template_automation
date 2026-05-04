@@ -214,27 +214,37 @@
     });
   }
 
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   // ── Render config fields HTML ──
   function renderFields(fields, prefix, values) {
     return fields.map(f => {
       const id = `${prefix}-${f.key}`;
-      const val = values[f.key] !== undefined ? values[f.key] : (f.default !== undefined ? f.default : '');
+      const rawVal = values[f.key] !== undefined ? values[f.key] : (f.default !== undefined ? f.default : '');
+      const val = escapeHTML(rawVal);
       let input;
 
       if (f.type === 'select') {
         input = `<select id="${id}" data-key="${f.key}">
-          ${f.options.map(o => `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`).join('')}
+          ${f.options.map(o => `<option value="${escapeHTML(o)}" ${o === rawVal ? 'selected' : ''}>${escapeHTML(o)}</option>`).join('')}
         </select>`;
       } else if (f.type === 'textarea') {
-        input = `<textarea id="${id}" data-key="${f.key}" rows="3" placeholder="${f.placeholder || ''}">${val}</textarea>`;
+        input = `<textarea id="${id}" data-key="${f.key}" rows="3" placeholder="${escapeHTML(f.placeholder || '')}">${val}</textarea>`;
       } else if (f.type === 'number') {
-        input = `<input type="number" id="${id}" data-key="${f.key}" value="${val}" placeholder="${f.placeholder || ''}">`;
+        input = `<input type="number" id="${id}" data-key="${f.key}" value="${val}" placeholder="${escapeHTML(f.placeholder || '')}">`;
       } else {
-        input = `<input type="text" id="${id}" data-key="${f.key}" value="${val}" placeholder="${f.placeholder || ''}">`;
+        input = `<input type="text" id="${id}" data-key="${f.key}" value="${val}" placeholder="${escapeHTML(f.placeholder || '')}">`;
       }
 
       return `<div class="form-group">
-        <label for="${id}">${f.label}</label>
+        <label for="${id}">${escapeHTML(f.label)}</label>
         ${input}
       </div>`;
     }).join('');
