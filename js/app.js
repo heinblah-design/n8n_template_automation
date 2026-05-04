@@ -157,7 +157,7 @@
   async function aiGenerate() {
     const prompt = userPrompt.value.trim();
     if (!prompt) return showToast('Please describe what you want to automate', 'warning');
-    if (!AIEngine.hasApiKey()) return showToast('Please save your OpenAI API key first', 'warning');
+    if (!AIEngine.hasApiKey()) return showToast('Please save your Gemini API key first', 'warning');
 
     // Show loading state
     const btnText = btnAiGenerate.querySelector('.btn-text');

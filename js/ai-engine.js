@@ -1,7 +1,7 @@
-// AI Engine — calls OpenAI API to generate n8n workflows
+// AI Engine — calls Google Gemini API to generate n8n workflows
 
 const AIEngine = (() => {
-  const STORAGE_KEY = 'n8n_openai_key';
+  const STORAGE_KEY = 'n8n_gemini_key';
 
   function getApiKey() {
     return localStorage.getItem(STORAGE_KEY) || '';
@@ -23,32 +23,37 @@ const AIEngine = (() => {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('No API key configured');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'x-goog-api-key': apiKey
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: N8N_KNOWLEDGE.systemPrompt },
-          { role: 'user', content: userPrompt }
+        contents: [
+          {
+            parts: [
+              { text: N8N_KNOWLEDGE.systemPrompt + '\n\nUser request: ' + userPrompt }
+            ]
+          }
         ],
-        temperature: 0.7,
-        max_tokens: 4096
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096
+        }
       })
     });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      if (response.status === 401) throw new Error('Invalid API key. Please check your OpenAI key.');
+      if (response.status === 400) throw new Error('Invalid request. Please check your API key and try again.');
+      if (response.status === 403) throw new Error('Invalid API key. Please check your Gemini key.');
       if (response.status === 429) throw new Error('Rate limit exceeded. Please wait a moment and try again.');
       throw new Error(err.error?.message || `API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) throw new Error('Empty response from AI');
 
     return parseWorkflowJSON(content);
