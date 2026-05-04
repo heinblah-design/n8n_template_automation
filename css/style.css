@@ -62,6 +62,7 @@ nav a {
   font-size: .9rem;
   font-weight: 500;
   transition: color .2s;
+  cursor: pointer;
 }
 nav a:hover, nav a.nav-active { color: var(--primary); }
 
@@ -102,6 +103,7 @@ main {
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
+  margin-top: 24px;
 }
 .card-header {
   display: flex;
@@ -173,17 +175,19 @@ select { cursor: pointer; }
   transition: background .2s, transform .1s;
 }
 .btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:disabled:active { transform: none; }
 .btn-primary {
   background: var(--primary);
   color: #fff;
 }
-.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
 .btn-secondary {
   background: var(--surface-hover);
   color: var(--text);
   border: 1px solid var(--border);
 }
-.btn-secondary:hover { background: var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--border); }
 .btn-danger {
   background: rgba(244,67,54,.15);
   color: var(--danger);
@@ -191,6 +195,141 @@ select { cursor: pointer; }
 }
 .btn-danger:hover { background: rgba(244,67,54,.25); }
 .btn-sm { padding: 6px 12px; font-size: .8rem; }
+.btn-lg { padding: 14px 32px; font-size: 1rem; }
+
+/* ── API Key ── */
+.api-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.api-key-row input { flex: 1; }
+.key-status {
+  font-size: .8rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: auto;
+}
+.key-status.saved {
+  background: rgba(76,175,80,.15);
+  color: var(--success);
+}
+.key-status.missing {
+  background: rgba(255,152,0,.15);
+  color: var(--warning);
+}
+
+/* ── Example Chips ── */
+.example-prompts { margin-top: 20px; }
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  padding: 8px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: border-color .2s, color .2s, background .2s;
+}
+.chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-bg);
+}
+
+/* ── Prompt Actions ── */
+.prompt-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Spinner ── */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── AI Summary ── */
+.ai-summary {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  font-size: .9rem;
+  line-height: 1.7;
+}
+.ai-summary h3 {
+  font-size: 1rem;
+  margin-bottom: 8px;
+  color: var(--primary);
+}
+.ai-summary .node-list {
+  list-style: none;
+  padding: 0;
+}
+.ai-summary .node-list li {
+  padding: 4px 0;
+  padding-left: 20px;
+  position: relative;
+}
+.ai-summary .node-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.ai-summary .node-list li:first-child::before {
+  background: var(--success);
+}
+
+/* ── JSON Details ── */
+#json-details, .json-details {
+  margin-top: 20px;
+}
+#json-details summary, .json-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: .9rem;
+  font-weight: 500;
+  padding: 8px 0;
+  user-select: none;
+}
+#json-details summary:hover, .json-details summary:hover {
+  color: var(--text);
+}
+#json-details pre, .json-details pre,
+#template-preview pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  overflow-x: auto;
+  max-height: 500px;
+  overflow-y: auto;
+  font-size: .82rem;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+#json-details code, .json-details code,
+#template-preview code { color: var(--text); }
 
 /* ── Trigger Grid ── */
 .trigger-grid {
@@ -299,18 +438,6 @@ select { cursor: pointer; }
   margin-bottom: 12px;
   color: var(--text-muted);
 }
-#template-preview pre {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 16px;
-  overflow-x: auto;
-  max-height: 500px;
-  overflow-y: auto;
-  font-size: .82rem;
-  line-height: 1.5;
-}
-#template-preview code { color: var(--text); }
 
 /* ── Visual Flow ── */
 #workflow-visual { margin-top: 24px; }
@@ -396,4 +523,7 @@ footer {
   .add-node-row { flex-direction: column; }
   .generate-actions { flex-direction: column; }
   .generate-actions .btn { width: 100%; justify-content: center; }
+  .api-key-row { flex-direction: column; }
+  .example-chips { flex-direction: column; }
+  .chip { text-align: center; }
 }

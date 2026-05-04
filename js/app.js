@@ -1,217 +1,24 @@
-/**
- * n8n Template Builder - Main Application
- */
-
-(function() {
+// n8n Template Builder — Main Application
+(function () {
   'use strict';
 
-  // ── State ──
-  let selectedTrigger = null;
-  let triggerValues = {};
-  let actionNodes = [];      // [{ id, typeId, values: {} }]
-  let generatedJSON = null;
-  let nodeIdCounter = 0;
+  // ══════════════════════════════════════
+  // Shared utilities
+  // ══════════════════════════════════════
 
-  // ── DOM Refs ──
-  const triggerGrid = document.getElementById('trigger-grid');
-  const triggerConfig = document.getElementById('trigger-config');
-  const nodesList = document.getElementById('nodes-list');
-  const nodeTypeSelect = document.getElementById('node-type-select');
-  const btnAddNode = document.getElementById('btn-add-node');
-  const btnGenerate = document.getElementById('btn-generate');
-  const btnCopy = document.getElementById('btn-copy');
-  const btnDownload = document.getElementById('btn-download');
-  const templatePreview = document.getElementById('template-preview');
-  const templateJSON = document.getElementById('template-json');
-  const visualFlow = document.getElementById('visual-flow');
-  const flowPlaceholder = document.getElementById('flow-placeholder');
-
-  // ── Initialize ──
-  function init() {
-    renderTriggers();
-    populateNodeSelect();
-    bindEvents();
-  }
-
-  // ── Render trigger options ──
-  function renderTriggers() {
-    triggerGrid.innerHTML = TRIGGERS.map(t => `
-      <div class="trigger-card" data-trigger="${t.id}">
-        <div class="trigger-icon">${t.icon}</div>
-        <div class="trigger-name">${t.name}</div>
-        <div class="trigger-desc">${t.desc}</div>
-      </div>
-    `).join('');
-  }
-
-  // ── Populate node type dropdown ──
-  function populateNodeSelect() {
-    const categories = {};
-    NODE_TYPES.forEach(n => {
-      if (!categories[n.category]) categories[n.category] = [];
-      categories[n.category].push(n);
-    });
-
-    let html = '<option value="">-- Select a node --</option>';
-    Object.entries(categories).forEach(([cat, nodes]) => {
-      html += `<optgroup label="${cat}">`;
-      nodes.forEach(n => {
-        html += `<option value="${n.id}">${n.icon} ${n.name}</option>`;
-      });
-      html += '</optgroup>';
-    });
-    nodeTypeSelect.innerHTML = html;
-  }
-
-  // ── Bind events ──
-  function bindEvents() {
-    // Trigger selection
-    triggerGrid.addEventListener('click', e => {
-      const card = e.target.closest('.trigger-card');
-      if (!card) return;
-      selectTrigger(card.dataset.trigger);
-    });
-
-    // Add node
-    btnAddNode.addEventListener('click', () => {
-      const typeId = nodeTypeSelect.value;
-      if (!typeId) return showToast('Please select a node type', 'warning');
-      addNode(typeId);
-      nodeTypeSelect.value = '';
-    });
-
-    // Generate
-    btnGenerate.addEventListener('click', generateTemplate);
-
-    // Copy
-    btnCopy.addEventListener('click', () => {
-      if (!generatedJSON) return;
-      navigator.clipboard.writeText(JSON.stringify(generatedJSON, null, 2))
-        .then(() => showToast('Copied to clipboard!'))
-        .catch(() => {
-          // Fallback
-          const ta = document.createElement('textarea');
-          ta.value = JSON.stringify(generatedJSON, null, 2);
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          showToast('Copied to clipboard!');
-        });
-    });
-
-    // Download
-    btnDownload.addEventListener('click', () => {
-      if (!generatedJSON) return;
-      const name = (document.getElementById('workflow-name').value || 'workflow').replace(/\s+/g, '_');
-      const blob = new Blob([JSON.stringify(generatedJSON, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${name}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast('Template downloaded!');
-    });
-  }
-
-  // ── Select trigger ──
-  function selectTrigger(triggerId) {
-    selectedTrigger = TRIGGERS.find(t => t.id === triggerId);
-    if (!selectedTrigger) return;
-
-    // Highlight card
-    document.querySelectorAll('.trigger-card').forEach(c => c.classList.remove('selected'));
-    document.querySelector(`.trigger-card[data-trigger="${triggerId}"]`).classList.add('selected');
-
-    // Reset trigger values
-    triggerValues = {};
-
-    // Render config fields
-    if (selectedTrigger.fields.length === 0) {
-      triggerConfig.classList.add('hidden');
-    } else {
-      triggerConfig.classList.remove('hidden');
-      triggerConfig.innerHTML = `<h4>${selectedTrigger.icon} ${selectedTrigger.name} Configuration</h4>` +
-        renderFields(selectedTrigger.fields, 'trigger', triggerValues);
-      bindFieldInputs(triggerConfig, 'trigger', triggerValues);
-    }
-
-    updateVisualFlow();
-  }
-
-  // ── Add action node ──
-  function addNode(typeId) {
-    const id = ++nodeIdCounter;
-    const entry = { id, typeId, values: {} };
-
-    // Set defaults
-    const def = NODE_TYPES.find(n => n.id === typeId);
-    if (def) {
-      def.fields.forEach(f => {
-        entry.values[f.key] = f.default !== undefined ? String(f.default) : '';
-      });
-    }
-
-    actionNodes.push(entry);
-    renderNodes();
-    updateVisualFlow();
-  }
-
-  // ── Remove node ──
-  function removeNode(id) {
-    actionNodes = actionNodes.filter(n => n.id !== id);
-    renderNodes();
-    updateVisualFlow();
-  }
-
-  // ── Move node ──
-  function moveNode(id, direction) {
-    const idx = actionNodes.findIndex(n => n.id === id);
-    if (idx < 0) return;
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= actionNodes.length) return;
-    [actionNodes[idx], actionNodes[newIdx]] = [actionNodes[newIdx], actionNodes[idx]];
-    renderNodes();
-    updateVisualFlow();
-  }
-
-  // ── Render all nodes ──
-  function renderNodes() {
-    if (actionNodes.length === 0) {
-      nodesList.innerHTML = '<p class="helper-text">No nodes added yet. Add nodes above to build your workflow.</p>';
-      return;
-    }
-
-    nodesList.innerHTML = actionNodes.map((entry, i) => {
-      const def = NODE_TYPES.find(n => n.id === entry.typeId);
-      if (!def) return '';
-      return `
-        <div class="node-item" data-node-id="${entry.id}">
-          <div class="node-item-header" onclick="toggleNodeBody(${entry.id})">
-            <div class="node-label">
-              <span class="node-order">${i + 1}</span>
-              <span class="node-icon">${def.icon}</span>
-              <span>${def.name}</span>
-            </div>
-            <div class="node-actions">
-              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); moveNodeUp(${entry.id})" title="Move Up">&uarr;</button>
-              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); moveNodeDown(${entry.id})" title="Move Down">&darr;</button>
-              <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); removeNodeById(${entry.id})" title="Remove">&times;</button>
-            </div>
-          </div>
-          <div class="node-item-body" id="node-body-${entry.id}" style="display:none;">
-            ${renderFields(def.fields, `node-${entry.id}`, entry.values)}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Bind inputs
-    actionNodes.forEach(entry => {
-      const body = document.getElementById(`node-body-${entry.id}`);
-      if (body) bindFieldInputs(body, `node-${entry.id}`, entry.values);
-    });
+  function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.style.background =
+      type === 'warning' ? 'var(--warning)' :
+      type === 'error'   ? 'var(--danger)'  : 'var(--success)';
+    toast.classList.remove('hidden');
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.classList.add('hidden'), 300);
+    }, 3000);
   }
 
   function escapeHTML(str) {
@@ -223,7 +30,339 @@
       .replace(/'/g, '&#39;');
   }
 
-  // ── Render config fields HTML ──
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => showToast('Copied to clipboard!'),
+        () => fallbackCopy(text)
+      );
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast('Copied to clipboard!'); }
+    catch { showToast('Copy failed — please copy manually', 'warning'); }
+    document.body.removeChild(ta);
+  }
+
+  function downloadJSON(json, filename) {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Downloaded!');
+  }
+
+  // ══════════════════════════════════════
+  // Mode switching (AI / Manual)
+  // ══════════════════════════════════════
+
+  const navAI = document.getElementById('nav-ai');
+  const navManual = document.getElementById('nav-manual');
+  const aiMode = document.getElementById('ai-mode');
+  const manualMode = document.getElementById('manual-mode');
+
+  navAI.addEventListener('click', (e) => {
+    e.preventDefault();
+    aiMode.classList.remove('hidden');
+    manualMode.classList.add('hidden');
+    navAI.classList.add('nav-active');
+    navManual.classList.remove('nav-active');
+  });
+
+  navManual.addEventListener('click', (e) => {
+    e.preventDefault();
+    manualMode.classList.remove('hidden');
+    aiMode.classList.add('hidden');
+    navManual.classList.add('nav-active');
+    navAI.classList.remove('nav-active');
+  });
+
+  // ══════════════════════════════════════
+  // AI Builder Mode
+  // ══════════════════════════════════════
+
+  const apiKeyInput = document.getElementById('api-key');
+  const btnToggleKey = document.getElementById('btn-toggle-key');
+  const btnSaveKey = document.getElementById('btn-save-key');
+  const keyStatus = document.getElementById('key-status');
+  const userPrompt = document.getElementById('user-prompt');
+  const btnAiGenerate = document.getElementById('btn-ai-generate');
+  const resultCard = document.getElementById('result-card');
+  const aiSummary = document.getElementById('ai-summary');
+  const aiTemplateJson = document.getElementById('ai-template-json');
+  const aiVisualFlow = document.getElementById('ai-visual-flow');
+  const btnCopyAi = document.getElementById('btn-copy-ai');
+  const btnDownloadAi = document.getElementById('btn-download-ai');
+  const btnRegenerate = document.getElementById('btn-regenerate');
+
+  let aiGeneratedJSON = null;
+
+  // Load saved API key
+  function updateKeyStatus() {
+    if (AIEngine.hasApiKey()) {
+      keyStatus.textContent = 'Saved';
+      keyStatus.className = 'key-status saved';
+      apiKeyInput.value = AIEngine.getApiKey();
+      btnAiGenerate.disabled = !userPrompt.value.trim();
+    } else {
+      keyStatus.textContent = 'Not set';
+      keyStatus.className = 'key-status missing';
+      btnAiGenerate.disabled = true;
+    }
+  }
+  updateKeyStatus();
+
+  btnToggleKey.addEventListener('click', () => {
+    const isPassword = apiKeyInput.type === 'password';
+    apiKeyInput.type = isPassword ? 'text' : 'password';
+    btnToggleKey.textContent = isPassword ? 'Hide' : 'Show';
+  });
+
+  btnSaveKey.addEventListener('click', () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) {
+      showToast('Please enter an API key', 'warning');
+      return;
+    }
+    AIEngine.saveApiKey(key);
+    updateKeyStatus();
+    showToast('API key saved to browser');
+  });
+
+  userPrompt.addEventListener('input', () => {
+    btnAiGenerate.disabled = !userPrompt.value.trim() || !AIEngine.hasApiKey();
+  });
+
+  // Example chips
+  document.querySelectorAll('.chip[data-prompt]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      userPrompt.value = chip.dataset.prompt;
+      userPrompt.dispatchEvent(new Event('input'));
+      userPrompt.focus();
+    });
+  });
+
+  // Generate with AI
+  async function aiGenerate() {
+    const prompt = userPrompt.value.trim();
+    if (!prompt) return showToast('Please describe what you want to automate', 'warning');
+    if (!AIEngine.hasApiKey()) return showToast('Please save your OpenAI API key first', 'warning');
+
+    // Show loading state
+    const btnText = btnAiGenerate.querySelector('.btn-text');
+    const btnLoading = btnAiGenerate.querySelector('.btn-loading');
+    btnText.classList.add('hidden');
+    btnLoading.classList.remove('hidden');
+    btnAiGenerate.disabled = true;
+
+    try {
+      aiGeneratedJSON = await AIEngine.generate(prompt);
+      displayAiResult(aiGeneratedJSON);
+      showToast('Workflow generated successfully!');
+    } catch (err) {
+      showToast(err.message, 'error');
+      resultCard.classList.add('hidden');
+    } finally {
+      btnText.classList.remove('hidden');
+      btnLoading.classList.add('hidden');
+      btnAiGenerate.disabled = false;
+    }
+  }
+
+  btnAiGenerate.addEventListener('click', aiGenerate);
+  btnRegenerate.addEventListener('click', aiGenerate);
+
+  // Display AI result
+  function displayAiResult(workflow) {
+    resultCard.classList.remove('hidden');
+
+    // Summary
+    const nodes = workflow.nodes || [];
+    const trigger = nodes.find(n => n.type && (n.type.toLowerCase().includes('trigger') || n.type.includes('webhook') || n.type.includes('cron')));
+    let summaryHTML = `<h3>${escapeHTML(workflow.name)}</h3>`;
+    summaryHTML += `<p style="color:var(--text-muted);margin-bottom:12px">${nodes.length} nodes in this workflow</p>`;
+    summaryHTML += '<ul class="node-list">';
+    nodes.forEach(n => {
+      const shortType = (n.type || '').replace('n8n-nodes-base.', '').replace('@n8n/n8n-nodes-langchain.', '');
+      summaryHTML += `<li><strong>${escapeHTML(n.name)}</strong> <span style="color:var(--text-muted)">(${escapeHTML(shortType)})</span></li>`;
+    });
+    summaryHTML += '</ul>';
+    aiSummary.innerHTML = summaryHTML;
+
+    // Visual flow
+    renderAiVisualFlow(nodes);
+
+    // JSON preview
+    aiTemplateJson.textContent = JSON.stringify(workflow, null, 2);
+
+    // Scroll to result
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderAiVisualFlow(nodes) {
+    if (!nodes.length) {
+      aiVisualFlow.innerHTML = '<p class="helper-text">No nodes in workflow</p>';
+      return;
+    }
+    let html = '';
+    nodes.forEach((node, i) => {
+      if (i > 0) html += '<div class="flow-arrow"></div>';
+      const isTrigger = node.type && (node.type.toLowerCase().includes('trigger') || node.type.includes('webhook') || node.type.includes('cron'));
+      const cls = isTrigger ? 'trigger' : 'action';
+      const shortType = (node.type || '').replace('n8n-nodes-base.', '').replace('@n8n/n8n-nodes-langchain.', '');
+      html += `<div class="flow-node">
+        <div class="flow-node-box ${cls}">${escapeHTML(node.name)}</div>
+        <span class="flow-node-type">${escapeHTML(shortType)}</span>
+      </div>`;
+    });
+    aiVisualFlow.innerHTML = html;
+  }
+
+  // Copy / Download AI result
+  btnCopyAi.addEventListener('click', () => {
+    if (!aiGeneratedJSON) return;
+    copyToClipboard(JSON.stringify(aiGeneratedJSON, null, 2));
+  });
+
+  btnDownloadAi.addEventListener('click', () => {
+    if (!aiGeneratedJSON) return;
+    const name = (aiGeneratedJSON.name || 'workflow').replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadJSON(JSON.stringify(aiGeneratedJSON, null, 2), `${name}.json`);
+  });
+
+  // ══════════════════════════════════════
+  // Manual Builder Mode (existing functionality)
+  // ══════════════════════════════════════
+
+  let selectedTrigger = null;
+  let triggerValues = {};
+  let actionNodes = [];
+  let generatedJSON = null;
+
+  // Render triggers
+  const triggerGrid = document.getElementById('trigger-grid');
+  const triggerConfig = document.getElementById('trigger-config');
+  if (typeof TRIGGERS !== 'undefined') {
+    TRIGGERS.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'trigger-card';
+      card.dataset.id = t.id;
+      card.innerHTML = `<div class="trigger-icon">${t.icon}</div>
+        <div class="trigger-name">${escapeHTML(t.name)}</div>
+        <div class="trigger-desc">${escapeHTML(t.desc)}</div>`;
+      card.addEventListener('click', () => selectTrigger(t));
+      triggerGrid.appendChild(card);
+    });
+  }
+
+  function selectTrigger(t) {
+    selectedTrigger = t;
+    triggerValues = {};
+    triggerGrid.querySelectorAll('.trigger-card').forEach(c => c.classList.remove('selected'));
+    triggerGrid.querySelector(`[data-id="${t.id}"]`).classList.add('selected');
+
+    if (t.fields && t.fields.length) {
+      triggerConfig.innerHTML = `<h4>${escapeHTML(t.name)} Configuration</h4>` + renderFields(t.fields, 'trigger', triggerValues);
+      triggerConfig.classList.remove('hidden');
+      bindFieldInputs(triggerConfig, 'trigger', triggerValues);
+    } else {
+      triggerConfig.innerHTML = '';
+      triggerConfig.classList.add('hidden');
+    }
+    updateVisualFlow();
+  }
+
+  // Render node type selector
+  const nodeTypeSelect = document.getElementById('node-type-select');
+  if (typeof NODE_TYPES !== 'undefined') {
+    NODE_TYPES.forEach(nt => {
+      const opt = document.createElement('option');
+      opt.value = nt.id;
+      opt.textContent = `${nt.icon} ${nt.name}`;
+      nodeTypeSelect.appendChild(opt);
+    });
+  }
+
+  // Add node
+  document.getElementById('btn-add-node').addEventListener('click', () => {
+    const id = nodeTypeSelect.value;
+    if (!id) return showToast('Please select a node type', 'warning');
+    const def = NODE_TYPES.find(n => n.id === id);
+    if (!def) return;
+    actionNodes.push({ id: Date.now(), def, values: {} });
+    renderNodes();
+    updateVisualFlow();
+    nodeTypeSelect.value = '';
+  });
+
+  function renderNodes() {
+    const list = document.getElementById('nodes-list');
+    list.innerHTML = '';
+    actionNodes.forEach((entry, idx) => {
+      const div = document.createElement('div');
+      div.className = 'node-item';
+      div.innerHTML = `
+        <div class="node-item-header" data-idx="${idx}">
+          <div class="node-label">
+            <span class="node-icon">${entry.def.icon}</span>
+            <span>${escapeHTML(entry.def.name)}</span>
+            <span class="node-order">#${idx + 1}</span>
+          </div>
+          <div class="node-actions">
+            ${idx > 0 ? `<button class="btn btn-sm btn-secondary" data-move="up" data-idx="${idx}" title="Move up">↑</button>` : ''}
+            ${idx < actionNodes.length - 1 ? `<button class="btn btn-sm btn-secondary" data-move="down" data-idx="${idx}" title="Move down">↓</button>` : ''}
+            <button class="btn btn-sm btn-danger" data-remove="${idx}" title="Remove">×</button>
+          </div>
+        </div>
+        <div class="node-item-body" id="node-body-${entry.id}">
+          ${entry.def.fields.length ? renderFields(entry.def.fields, `node-${entry.id}`, entry.values) : '<p class="helper-text">No configuration needed</p>'}
+        </div>`;
+      list.appendChild(div);
+    });
+
+    // Bind events
+    list.querySelectorAll('[data-move]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = +btn.dataset.idx;
+        const dir = btn.dataset.move === 'up' ? -1 : 1;
+        [actionNodes[i], actionNodes[i + dir]] = [actionNodes[i + dir], actionNodes[i]];
+        renderNodes();
+        updateVisualFlow();
+      });
+    });
+    list.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        actionNodes.splice(+btn.dataset.remove, 1);
+        renderNodes();
+        updateVisualFlow();
+      });
+    });
+    list.querySelectorAll('.node-item-header').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const body = hdr.nextElementSibling;
+        body.style.display = body.style.display === 'none' ? '' : 'none';
+      });
+    });
+
+    actionNodes.forEach(entry => {
+      const body = document.getElementById(`node-body-${entry.id}`);
+      if (body) bindFieldInputs(body, `node-${entry.id}`, entry.values);
+    });
+  }
+
   function renderFields(fields, prefix, values) {
     return fields.map(f => {
       const id = `${prefix}-${f.key}`;
@@ -250,12 +389,10 @@
     }).join('');
   }
 
-  // ── Bind field inputs to values ──
   function bindFieldInputs(container, prefix, values) {
     container.querySelectorAll('input, select, textarea').forEach(el => {
       const key = el.dataset.key;
       if (!key) return;
-      // Initialize value
       if (values[key] === undefined) {
         values[key] = el.value;
       }
@@ -264,7 +401,7 @@
     });
   }
 
-  // ── Generate template ──
+  // Generate template (manual mode)
   function generateTemplate() {
     if (!selectedTrigger) {
       return showToast('Please select a trigger first!', 'warning');
@@ -273,78 +410,53 @@
     const workflowName = document.getElementById('workflow-name').value || 'My Workflow';
     generatedJSON = generateN8nTemplate(workflowName, selectedTrigger, triggerValues, actionNodes);
 
-    // Show preview
-    templateJSON.textContent = JSON.stringify(generatedJSON, null, 2);
-    templatePreview.classList.remove('hidden');
-    btnCopy.classList.remove('hidden');
-    btnDownload.classList.remove('hidden');
+    const jsonStr = JSON.stringify(generatedJSON, null, 2);
+    document.getElementById('template-json').textContent = jsonStr;
+    document.getElementById('template-preview').classList.remove('hidden');
+    document.getElementById('btn-copy').classList.remove('hidden');
+    document.getElementById('btn-download').classList.remove('hidden');
 
-    // Smooth scroll to preview
-    templatePreview.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    showToast('Template generated successfully!');
+    showToast('Template generated!');
   }
 
-  // ── Update visual flow ──
+  document.getElementById('btn-generate').addEventListener('click', generateTemplate);
+
+  document.getElementById('btn-copy').addEventListener('click', () => {
+    if (!generatedJSON) return;
+    copyToClipboard(JSON.stringify(generatedJSON, null, 2));
+  });
+
+  document.getElementById('btn-download').addEventListener('click', () => {
+    if (!generatedJSON) return;
+    const name = (generatedJSON.name || 'workflow').replace(/[^a-zA-Z0-9_-]/g, '_');
+    downloadJSON(JSON.stringify(generatedJSON, null, 2), `${name}.json`);
+  });
+
+  // Visual flow (manual mode)
   function updateVisualFlow() {
+    const container = document.getElementById('visual-flow');
+    const placeholder = document.getElementById('flow-placeholder');
     if (!selectedTrigger) {
-      visualFlow.innerHTML = '<p class="helper-text" id="flow-placeholder">Select a trigger to see the workflow preview.</p>';
+      container.innerHTML = '';
+      container.appendChild(placeholder);
+      placeholder.classList.remove('hidden');
       return;
     }
 
-    let html = '';
-
-    // Trigger node
-    html += `<div class="flow-node">
-      <div class="flow-node-box trigger">${selectedTrigger.icon} ${selectedTrigger.name}</div>
-      <div class="flow-node-type">Trigger</div>
+    let html = `<div class="flow-node">
+      <div class="flow-node-box trigger">${escapeHTML(selectedTrigger.name)}</div>
+      <span class="flow-node-type">${escapeHTML(selectedTrigger.n8nType.replace('n8n-nodes-base.', ''))}</span>
     </div>`;
 
-    // Action nodes
     actionNodes.forEach(entry => {
-      const def = NODE_TYPES.find(n => n.id === entry.typeId);
-      if (!def) return;
-      html += `<div class="flow-arrow"></div>`;
-      html += `<div class="flow-node">
-        <div class="flow-node-box action">${def.icon} ${def.name}</div>
-        <div class="flow-node-type">${def.category}</div>
-      </div>`;
+      html += `<div class="flow-arrow"></div>
+        <div class="flow-node">
+          <div class="flow-node-box action">${escapeHTML(entry.def.name)}</div>
+          <span class="flow-node-type">${escapeHTML(entry.def.n8nType.replace('n8n-nodes-base.', ''))}</span>
+        </div>`;
     });
 
-    visualFlow.innerHTML = html;
+    container.innerHTML = html;
   }
 
-  // ── Toast notification ──
-  function showToast(message, type) {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.style.background = type === 'warning' ? 'var(--warning)' : 'var(--success)';
-    toast.classList.remove('hidden');
-    toast.classList.add('show');
-    setTimeout(() => {
-      toast.classList.remove('show');
-      setTimeout(() => toast.classList.add('hidden'), 300);
-    }, 2500);
-  }
-
-  // ── Global functions for inline event handlers ──
-  window.toggleNodeBody = function(id) {
-    const body = document.getElementById(`node-body-${id}`);
-    if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
-  };
-
-  window.removeNodeById = function(id) {
-    removeNode(id);
-  };
-
-  window.moveNodeUp = function(id) {
-    moveNode(id, -1);
-  };
-
-  window.moveNodeDown = function(id) {
-    moveNode(id, 1);
-  };
-
-  // ── Boot ──
-  init();
 })();

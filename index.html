@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>n8n Template Automation</title>
+  <title>n8n Template Generator — AI-Powered</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,115 +17,184 @@
           <rect width="32" height="32" rx="8" fill="#ff6d5a"/>
           <path d="M10 16h4l2-4 4 8 2-4h4" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>n8n Template Builder</span>
+        <span>n8n AI Template Generator</span>
       </div>
       <nav>
-        <a href="#builder" class="nav-active">Builder</a>
+        <a href="#" class="nav-active" id="nav-ai">AI Builder</a>
+        <a href="#" id="nav-manual">Manual Builder</a>
         <a href="https://docs.n8n.io/" target="_blank" rel="noopener">n8n Docs</a>
       </nav>
     </div>
   </header>
 
-  <main id="builder">
-    <section class="hero">
-      <h1>Build n8n Workflow Templates</h1>
-      <p>Configure your automation workflow, add nodes, and generate a ready-to-import n8n JSON template.</p>
-    </section>
+  <main>
+    <!-- ═══ AI Builder Mode ═══ -->
+    <div id="ai-mode">
+      <section class="hero">
+        <h1>Describe Your Automation</h1>
+        <p>Tell the AI what you want to automate, and it will generate a ready-to-import n8n workflow template.</p>
+      </section>
 
-    <div class="builder-container">
-      <!-- Step 1: Workflow Info -->
-      <div class="card" id="step-info">
+      <!-- API Key -->
+      <div class="card" id="api-key-card">
         <div class="card-header">
-          <span class="step-badge">1</span>
-          <h2>Workflow Info</h2>
+          <span class="step-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </span>
+          <h2>OpenAI API Key</h2>
+          <span class="key-status" id="key-status"></span>
         </div>
         <div class="card-body">
-          <div class="form-group">
-            <label for="workflow-name">Workflow Name</label>
-            <input type="text" id="workflow-name" placeholder="My Automation Workflow" value="My Automation Workflow">
-          </div>
-          <div class="form-group">
-            <label for="workflow-desc">Description (optional)</label>
-            <textarea id="workflow-desc" rows="2" placeholder="Describe what this workflow does..."></textarea>
+          <p class="helper-text">Enter your OpenAI API key. It stays in your browser and is never stored on any server.</p>
+          <div class="api-key-row">
+            <input type="password" id="api-key" placeholder="sk-..." autocomplete="off">
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-key" title="Show/hide key">Show</button>
+            <button class="btn btn-primary btn-sm" id="btn-save-key">Save</button>
           </div>
         </div>
       </div>
 
-      <!-- Step 2: Trigger -->
-      <div class="card" id="step-trigger">
+      <!-- User Prompt -->
+      <div class="card" id="prompt-card">
         <div class="card-header">
-          <span class="step-badge">2</span>
-          <h2>Select Trigger</h2>
+          <span class="step-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <h2>What do you want to automate?</h2>
         </div>
         <div class="card-body">
-          <p class="helper-text">Choose how your workflow starts.</p>
-          <div class="trigger-grid" id="trigger-grid">
-            <!-- Triggers populated by JS -->
+          <textarea id="user-prompt" rows="4" placeholder="Example: When I receive a new email, extract the sender and subject, check if it's from a VIP list in Google Sheets, and if so, send a Slack notification to #important channel..."></textarea>
+          <div class="prompt-actions">
+            <button class="btn btn-primary btn-lg" id="btn-ai-generate" disabled>
+              <span class="btn-text">Generate n8n Template</span>
+              <span class="btn-loading hidden">
+                <span class="spinner"></span> Generating...
+              </span>
+            </button>
           </div>
-          <div id="trigger-config" class="node-config hidden"></div>
-        </div>
-      </div>
-
-      <!-- Step 3: Nodes -->
-      <div class="card" id="step-nodes">
-        <div class="card-header">
-          <span class="step-badge">3</span>
-          <h2>Add Nodes</h2>
-        </div>
-        <div class="card-body">
-          <p class="helper-text">Add action nodes to your workflow. They will execute in order.</p>
-          <div id="nodes-list"></div>
-          <div class="add-node-section">
-            <label for="node-type-select">Node Type</label>
-            <div class="add-node-row">
-              <select id="node-type-select">
-                <option value="">-- Select a node --</option>
-              </select>
-              <button class="btn btn-secondary" id="btn-add-node">+ Add Node</button>
+          <div class="example-prompts">
+            <p class="helper-text">Try these examples:</p>
+            <div class="example-chips">
+              <button class="chip" data-prompt="When a new row is added to Google Sheets, send a Slack message to #general with the row data">Google Sheets → Slack</button>
+              <button class="chip" data-prompt="Every day at 9 AM, fetch the weather forecast from an API and send it to my Telegram chat">Daily Weather → Telegram</button>
+              <button class="chip" data-prompt="When a webhook receives a POST request with customer data, save it to Google Sheets and send a confirmation email">Webhook → Sheets + Email</button>
+              <button class="chip" data-prompt="Monitor an RSS feed every hour, and for each new article, summarize it with AI and post to Discord">RSS → AI Summary → Discord</button>
+              <button class="chip" data-prompt="When a new email arrives in Gmail, use AI to classify it as urgent or not, and if urgent, send a Telegram notification">Email → AI Classify → Telegram</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Step 4: Generate -->
-      <div class="card" id="step-generate">
+      <!-- AI Result -->
+      <div class="card hidden" id="result-card">
         <div class="card-header">
-          <span class="step-badge">4</span>
-          <h2>Generate Template</h2>
+          <h2>Generated Workflow</h2>
         </div>
         <div class="card-body">
+          <div id="ai-summary" class="ai-summary"></div>
           <div class="generate-actions">
-            <button class="btn btn-primary" id="btn-generate">Generate n8n Template</button>
-            <button class="btn btn-secondary hidden" id="btn-copy">Copy to Clipboard</button>
-            <button class="btn btn-secondary hidden" id="btn-download">Download JSON</button>
+            <button class="btn btn-primary" id="btn-copy-ai">Copy to Clipboard</button>
+            <button class="btn btn-secondary" id="btn-download-ai">Download JSON</button>
+            <button class="btn btn-secondary" id="btn-regenerate">Regenerate</button>
           </div>
-          <div id="template-preview" class="hidden">
-            <h3>Template Preview</h3>
-            <pre><code id="template-json"></code></pre>
-          </div>
+          <div id="ai-visual-flow" class="visual-flow"></div>
+          <details id="json-details">
+            <summary>View JSON Template</summary>
+            <pre><code id="ai-template-json"></code></pre>
+          </details>
         </div>
       </div>
     </div>
 
-    <!-- Visual workflow preview -->
-    <div class="card" id="workflow-visual">
-      <div class="card-header">
-        <h2>Workflow Preview</h2>
+    <!-- ═══ Manual Builder Mode (existing) ═══ -->
+    <div id="manual-mode" class="hidden">
+      <section class="hero">
+        <h1>Build n8n Workflow Templates</h1>
+        <p>Configure your automation workflow step by step.</p>
+      </section>
+
+      <div class="builder-container">
+        <div class="card" id="step-info">
+          <div class="card-header">
+            <span class="step-badge">1</span>
+            <h2>Workflow Info</h2>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="workflow-name">Workflow Name</label>
+              <input type="text" id="workflow-name" placeholder="My Automation Workflow" value="My Automation Workflow">
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="step-trigger">
+          <div class="card-header">
+            <span class="step-badge">2</span>
+            <h2>Select Trigger</h2>
+          </div>
+          <div class="card-body">
+            <p class="helper-text">Choose how your workflow starts.</p>
+            <div class="trigger-grid" id="trigger-grid"></div>
+            <div id="trigger-config" class="node-config hidden"></div>
+          </div>
+        </div>
+
+        <div class="card" id="step-nodes">
+          <div class="card-header">
+            <span class="step-badge">3</span>
+            <h2>Add Nodes</h2>
+          </div>
+          <div class="card-body">
+            <p class="helper-text">Add action nodes to your workflow.</p>
+            <div id="nodes-list"></div>
+            <div class="add-node-section">
+              <label for="node-type-select">Node Type</label>
+              <div class="add-node-row">
+                <select id="node-type-select"><option value="">-- Select a node --</option></select>
+                <button class="btn btn-secondary" id="btn-add-node">+ Add Node</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="step-generate">
+          <div class="card-header">
+            <span class="step-badge">4</span>
+            <h2>Generate Template</h2>
+          </div>
+          <div class="card-body">
+            <div class="generate-actions">
+              <button class="btn btn-primary" id="btn-generate">Generate n8n Template</button>
+              <button class="btn btn-secondary hidden" id="btn-copy">Copy to Clipboard</button>
+              <button class="btn btn-secondary hidden" id="btn-download">Download JSON</button>
+            </div>
+            <div id="template-preview" class="hidden">
+              <h3>Template Preview</h3>
+              <pre><code id="template-json"></code></pre>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="card-body">
-        <div id="visual-flow" class="visual-flow">
-          <p class="helper-text" id="flow-placeholder">Select a trigger to see the workflow preview.</p>
+
+      <div class="card" id="workflow-visual">
+        <div class="card-header"><h2>Workflow Preview</h2></div>
+        <div class="card-body">
+          <div id="visual-flow" class="visual-flow">
+            <p class="helper-text" id="flow-placeholder">Select a trigger to see the workflow preview.</p>
+          </div>
         </div>
       </div>
     </div>
   </main>
 
   <footer>
-    <p>n8n Template Builder &mdash; Generate workflow templates for <a href="https://n8n.io" target="_blank" rel="noopener">n8n</a></p>
+    <p>n8n AI Template Generator &mdash; Powered by AI &middot; Generate workflow templates for <a href="https://n8n.io" target="_blank" rel="noopener">n8n</a></p>
   </footer>
 
   <div id="toast" class="toast hidden"></div>
 
+  <script src="js/n8n-knowledge.js"></script>
+  <script src="js/ai-engine.js"></script>
   <script src="js/nodes.js"></script>
   <script src="js/generator.js"></script>
   <script src="js/app.js"></script>
