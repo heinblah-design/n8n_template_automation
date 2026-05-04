@@ -42,7 +42,7 @@ function generateN8nTemplate(workflowName, triggerDef, triggerValues, nodeEntrie
   // Build action nodes
   let prevNodeName = triggerName;
   nodeEntries.forEach((entry, i) => {
-    const def = NODE_TYPES.find(n => n.id === entry.typeId);
+    const def = entry.def || NODE_TYPES.find(n => n.id === entry.typeId);
     if (!def) return;
 
     const nodeName = uniqueName(def.name, usedNames);
